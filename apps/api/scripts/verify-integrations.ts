@@ -23,6 +23,8 @@ import {
   OKX_RWA_ISSUER_XSTOCKS,
   OKX_RWA_CATEGORY_ALL
 } from "../src/lib/xlayer-config";
+import { findFeedId, getLatestPrices } from "../src/lib/pyth";
+import { TRACKED_XSTOCK_SYMBOLS } from "../src/lib/pyth-config";
 
 interface OkxRwaTokenListResponse {
   cursor: string;
@@ -110,7 +112,6 @@ async function checkOkxAuthBaseline(): Promise<void> {
 }
 
 async function checkOkxXLayer(): Promise<void> {
-  // This is the one thing Session 3 could NOT verify from the sandbox:
   // whether X Layer specifically (as opposed to Ethereum) returns any
   // xStocks rows from this endpoint.
   const name = `OKX — xStocks on X Layer (chainIndex=${X_LAYER_CHAIN_INDEX}, the real target)`;
@@ -145,6 +146,40 @@ async function checkOkxXLayer(): Promise<void> {
   }
 }
 
+async function checkPyth(): Promise<void> {
+  const name = "Pyth — xStock feed resolution + price (Session 9, Solana)";
+  try {
+    const target = TRACKED_XSTOCK_SYMBOLS[0]!;
+    const feed = await findFeedId(target.xstockSymbol, "crypto");
+    if (!feed) {
+      record(
+        name,
+        false,
+        `No Pyth feed found for "${target.xstockSymbol}" — check PYTH_API_KEY is set and valid, and that this symbol still exists on Pyth.`
+      );
+      return;
+    }
+    const prices = await getLatestPrices([feed.id]);
+    const price = prices[feed.id];
+    if (!price) {
+      record(
+        name,
+        false,
+        `Feed resolved (id ${feed.id}) but no live price came back for it.`
+      );
+      return;
+    }
+    record(
+      name,
+      true,
+      `${target.xstockSymbol} resolved to feed ${feed.id}, price $${price.priceUsd.toFixed(2)} as of ${price.publishedAt}. PYTH_API_KEY works.`
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    record(name, false, message);
+  }
+}
+
 async function main() {
   console.log("Reventurn integration check\n");
 
@@ -153,6 +188,8 @@ async function main() {
   await checkOkxAuthBaseline();
   console.log("");
   await checkOkxXLayer();
+  console.log("");
+  await checkPyth();
 
   const passCount = results.filter((r) => r.ok).length;
   console.log(`\n${passCount}/${results.length} checks passed.`);

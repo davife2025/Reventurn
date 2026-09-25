@@ -3,7 +3,8 @@ import type {
   ApiResponse,
   HealthStatus,
   RateComparison,
-  TokenizedAssetList
+  TokenizedAssetList,
+  SolanaAssetList
 } from "@reventurn/types";
 import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
@@ -36,10 +37,11 @@ export default async function HomePage() {
     data: { user }
   } = await supabase.auth.getUser();
 
-  const [health, rates, assets] = await Promise.all([
+  const [health, rates, assets, solanaAssets] = await Promise.all([
     getJson<HealthStatus>("/health"),
     getJson<RateComparison>("/rates"),
-    getJson<TokenizedAssetList>("/assets")
+    getJson<TokenizedAssetList>("/assets"),
+    getJson<SolanaAssetList>("/assets/solana")
   ]);
 
   return (
@@ -228,6 +230,73 @@ export default async function HomePage() {
           <p className="mt-2 text-xs text-graphite-500">
             Contract addresses and prices are resolved live from OKX's Market
             API for X Layer (chainIndex 196) — nothing here is hardcoded.
+          </p>
+        </section>
+
+        <section className="rounded-lg border border-graphite-700 p-4">
+          <h2 className="flex items-center gap-2 font-heading text-sm font-medium text-graphite-200">
+            <SectionIcon path="M2 7l5 5 3-3 4 4" />
+            Same stocks, priced on Solana — via Pyth
+          </h2>
+          <p className="mt-1 text-xs text-graphite-500">
+            The same tokenized-stock thesis, on a second chain: xStocks
+            trade on Solana too. Prices below come from Pyth Network,
+            resolved live by symbol — no feed id is hardcoded.
+          </p>
+
+          {solanaAssets?.ok ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[480px] text-left text-sm">
+                <thead>
+                  <tr className="border-b border-graphite-700 text-graphite-400">
+                    <th className="py-2 font-normal">xStock</th>
+                    <th className="py-2 pr-1 text-right font-normal">
+                      Token price
+                    </th>
+                    <th className="py-2 pr-1 text-right font-normal">
+                      Stock price
+                    </th>
+                    <th className="py-2 pr-1 text-right font-normal">Peg</th>
+                  </tr>
+                </thead>
+                <tbody className="font-data">
+                  {solanaAssets.data.assets.map((asset) => (
+                    <tr
+                      key={asset.xstockSymbol}
+                      className="border-b border-graphite-800 align-top"
+                    >
+                      <td className="py-2 font-sans font-medium text-graphite-50">
+                        {asset.xstockSymbol}
+                      </td>
+                      <td className="py-2 pr-1 text-right text-graphite-50 tabular-nums">
+                        {asset.xstockPriceUsd !== null
+                          ? `$${asset.xstockPriceUsd.toFixed(2)}`
+                          : "—"}
+                      </td>
+                      <td className="py-2 pr-1 text-right text-graphite-300 tabular-nums">
+                        {asset.equityPriceUsd !== null
+                          ? `$${asset.equityPriceUsd.toFixed(2)}`
+                          : "—"}
+                      </td>
+                      <td className="py-2 pr-1 text-right text-graphite-400 tabular-nums">
+                        {asset.pegRatio !== null ? asset.pegRatio.toFixed(3) : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-graphite-300">
+              {solanaAssets === null
+                ? "apps/api unreachable — start it with `pnpm dev` and confirm PYTH_API_KEY is set."
+                : `${solanaAssets.error}`}
+            </p>
+          )}
+
+          <p className="mt-2 text-xs text-graphite-500">
+            Peg = token price ÷ real stock price. 1.000 means the on-chain
+            token is trading exactly in line with the underlying share.
           </p>
         </section>
       </main>

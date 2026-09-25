@@ -24,3 +24,8 @@ export interface HealthStatus {
   service: "reventurn-api";
   timestamp: string;
 }
+
+export * from "./rates";
+export * from "./assets";
+export * from "./chat";
+export * from "./solana-assets";
