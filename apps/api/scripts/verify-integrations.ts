@@ -25,6 +25,8 @@ import {
 } from "../src/lib/xlayer-config";
 import { findFeedId, getLatestPrices } from "../src/lib/pyth";
 import { TRACKED_XSTOCK_SYMBOLS } from "../src/lib/pyth-config";
+import { XSTOCK_SOLANA_MINTS } from "../src/lib/solana-mints";
+import { getTokenSupply } from "../src/lib/solana-rpc";
 
 interface OkxRwaTokenListResponse {
   cursor: string;
@@ -180,6 +182,34 @@ async function checkPyth(): Promise<void> {
   }
 }
 
+async function checkSolanaRpc(): Promise<void> {
+  const name = "Solana RPC — on-chain token supply read (Session 11)";
+  try {
+    const [symbol, mint] = Object.entries(XSTOCK_SOLANA_MINTS)[0]!;
+    const supply = await getTokenSupply(mint);
+    if (!supply) {
+      record(
+        name,
+        false,
+        `RPC call succeeded but "${mint}" (${symbol}) didn't come back as a valid mint — verify the address against https://solana.com/news/case-study-xstocks.`
+      );
+      return;
+    }
+    record(
+      name,
+      true,
+      `${symbol} (${mint}) real on-chain supply: ${supply.uiAmount?.toLocaleString() ?? "unknown"} tokens, ${supply.decimals} decimals. Solana RPC works.`
+    );
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    record(
+      name,
+      false,
+      `${message} — if using the default public RPC, this may just be rate-limiting; consider setting SOLANA_RPC_URL to a dedicated provider.`
+    );
+  }
+}
+
 async function main() {
   console.log("Reventurn integration check\n");
 
@@ -190,6 +220,8 @@ async function main() {
   await checkOkxXLayer();
   console.log("");
   await checkPyth();
+  console.log("");
+  await checkSolanaRpc();
 
   const passCount = results.filter((r) => r.ok).length;
   console.log(`\n${passCount}/${results.length} checks passed.`);

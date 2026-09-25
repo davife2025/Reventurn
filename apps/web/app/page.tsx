@@ -251,13 +251,14 @@ export default async function HomePage() {
           </h2>
           <p className="mt-1 text-xs text-graphite-500">
             The same tokenized-stock thesis, on a second chain: xStocks
-            trade on Solana too. Prices below come from Pyth Network,
-            resolved live by symbol — no feed id is hardcoded.
+            trade on Solana too. Prices come from Pyth, resolved live by
+            symbol. Mint address and supply are read directly from Solana
+            via RPC — genuine on-chain data, not just an off-chain price.
           </p>
 
           {solanaAssets?.ok ? (
             <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[480px] text-left text-sm">
+              <table className="w-full min-w-[560px] text-left text-sm">
                 <thead>
                   <tr className="border-b border-graphite-700 text-graphite-400">
                     <th className="py-2 font-normal">xStock</th>
@@ -268,6 +269,7 @@ export default async function HomePage() {
                       Stock price
                     </th>
                     <th className="py-2 pr-1 text-right font-normal">Peg</th>
+                    <th className="py-2 font-normal">Mint (Solana)</th>
                   </tr>
                 </thead>
                 <tbody className="font-data">
@@ -291,6 +293,25 @@ export default async function HomePage() {
                       </td>
                       <td className="py-2 pr-1 text-right text-graphite-400 tabular-nums">
                         {asset.pegRatio !== null ? asset.pegRatio.toFixed(3) : "—"}
+                      </td>
+                      <td className="py-2">
+                        {asset.explorerUrl ? (
+                          <a
+                            href={asset.explorerUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="whitespace-nowrap text-xs text-graphite-400 underline decoration-graphite-600 hover:text-amber-400"
+                          >
+                            {asset.mintAddress}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-graphite-500">—</span>
+                        )}
+                        {asset.onchainSupplyUi !== null && (
+                          <div className="mt-0.5 text-xs text-graphite-500">
+                            supply: {asset.onchainSupplyUi.toLocaleString()}
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}

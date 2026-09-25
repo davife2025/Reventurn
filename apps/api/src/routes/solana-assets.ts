@@ -6,6 +6,8 @@ import type {
 } from "@reventurn/types";
 import { TRACKED_XSTOCK_SYMBOLS } from "../lib/pyth-config";
 import { findFeedId, getLatestPrices } from "../lib/pyth";
+import { XSTOCK_SOLANA_MINTS, buildSolscanUrl } from "../lib/solana-mints";
+import { getTokenSupply } from "../lib/solana-rpc";
 import { getCached, setCached } from "../lib/cache";
 
 export const solanaAssetsRouter = Router();
@@ -59,14 +61,36 @@ solanaAssetsRouter.get("/", async (_req, res) => {
 
     const prices = await getLatestPrices(allFeedIds);
 
+    // Step 2b: real on-chain read. For every symbol with a verified mint
+    // address (Session 11), fetch its live supply directly from Solana —
+    // independent of Pyth, and independent of whether Pyth resolved
+    // anything for that symbol.
+    const supplyResults = await Promise.allSettled(
+      TRACKED_XSTOCK_SYMBOLS.map(async (s) => {
+        const mint = XSTOCK_SOLANA_MINTS[s.xstockSymbol] ?? null;
+        const supply = mint ? await getTokenSupply(mint) : null;
+        return { symbol: s.xstockSymbol, mint, supply };
+      })
+    );
+    const supplyBySymbol = new Map<
+      string,
+      { symbol: string; mint: string | null; supply: { uiAmount: number | null } | null }
+    >();
+    for (const r of supplyResults) {
+      if (r.status === "fulfilled") {
+        supplyBySymbol.set(r.value.symbol, r.value);
+      }
+    }
+
     // Step 3: assemble the comparison, skipping symbols where neither
     // side resolved rather than showing an empty row.
     const assets: SolanaTokenizedAsset[] = resolved
       .map((r): SolanaTokenizedAsset | null => {
         const xstockPrice = r.xstockFeedId ? prices[r.xstockFeedId] : undefined;
         const equityPrice = r.equityFeedId ? prices[r.equityFeedId] : undefined;
+        const onchain = supplyBySymbol.get(r.xstockSymbol);
 
-        if (!xstockPrice && !equityPrice) return null;
+        if (!xstockPrice && !equityPrice && !onchain?.mint) return null;
 
         const pegRatio =
           xstockPrice && equityPrice
@@ -82,7 +106,10 @@ solanaAssetsRouter.get("/", async (_req, res) => {
           xstockPriceUsd: xstockPrice?.priceUsd ?? null,
           equityPriceUsd: equityPrice?.priceUsd ?? null,
           pegRatio,
-          publishedAt: xstockPrice?.publishedAt ?? equityPrice?.publishedAt ?? null
+          publishedAt: xstockPrice?.publishedAt ?? equityPrice?.publishedAt ?? null,
+          mintAddress: onchain?.mint ?? null,
+          explorerUrl: onchain?.mint ? buildSolscanUrl(onchain.mint) : null,
+          onchainSupplyUi: onchain?.supply?.uiAmount ?? null
         };
       })
       .filter((a): a is SolanaTokenizedAsset => a !== null);
@@ -91,7 +118,7 @@ solanaAssetsRouter.get("/", async (_req, res) => {
       const body: ApiResponse<SolanaAssetList> = {
         ok: false,
         error:
-          "No Pyth feeds resolved for any tracked xStock symbol. Check PYTH_API_KEY is set and valid — see apps/api/scripts/verify-integrations.ts to add a check for this."
+          "Nothing resolved for any tracked xStock symbol — no Pyth price and no on-chain Solana data. Check PYTH_API_KEY is set, and that the Solana RPC endpoint is reachable. Run `pnpm verify` in apps/api for a clearer breakdown."
       };
       res.status(200).json(body);
       return;
