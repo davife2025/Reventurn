@@ -29,3 +29,4 @@ export * from "./rates";
 export * from "./assets";
 export * from "./chat";
 export * from "./solana-assets";
+export * from "./allocation";

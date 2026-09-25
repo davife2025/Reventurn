@@ -10,6 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { signOut } from "./actions";
 import { TickerRail } from "./components/TickerRail";
 import { Footer } from "./components/Footer";
+import { AllocationPlanner } from "./components/AllocationPlanner";
 
 async function getJson<T>(path: string): Promise<ApiResponse<T> | null> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL;
@@ -164,6 +165,8 @@ export default async function HomePage() {
           )}
         </section>
 
+        <AllocationPlanner observations={rates?.ok ? rates.data.observations : []} />
+
         <section className="rounded-lg border border-graphite-700 p-4">
           <h2 className="flex items-center gap-2 font-heading text-sm font-medium text-graphite-200">
             <SectionIcon path="M2 12l4-6 3 3 5-7" />
@@ -231,6 +234,14 @@ export default async function HomePage() {
             Contract addresses and prices are resolved live from OKX's Market
             API for X Layer (chainIndex 196) — nothing here is hardcoded.
           </p>
+          <a
+            href="https://www.okx.com/web3/dex-swap"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-block text-xs text-amber-400 underline decoration-amber-700 hover:text-amber-300"
+          >
+            Trade on OKX DEX &rarr;
+          </a>
         </section>
 
         <section className="rounded-lg border border-graphite-700 p-4">
@@ -298,6 +309,14 @@ export default async function HomePage() {
             Peg = token price ÷ real stock price. 1.000 means the on-chain
             token is trading exactly in line with the underlying share.
           </p>
+          <a
+            href="https://jup.ag/swap"
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 inline-block text-xs text-amber-400 underline decoration-amber-700 hover:text-amber-300"
+          >
+            Trade on Jupiter (Solana) &rarr;
+          </a>
         </section>
       </main>
       <Footer health={health} />
